@@ -1,0 +1,63 @@
+steps:
+  # Install dependencies and run scripts
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        apt-get update && apt-get install -y wget gnupg
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
+        apt-get update && apt-get install -y google-chrome-stable
+
+        CHROME_VERSION=$$(google-chrome --version | cut -d " " -f3 | cut -d "." -f1-3)
+        CHROMEDRIVER_VERSION=$$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$${CHROME_VERSION})
+        wget https://chromedriver.storage.googleapis.com/$${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
+        unzip chromedriver_linux64.zip -d /usr/local/bin
+        rm chromedriver_linux64.zip
+
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+        echo "Installed Python packages:"
+        pip list
+        echo "Chrome version:"
+        google-chrome --version
+        echo "ChromeDriver version:"
+        chromedriver --version
+        echo "System information:"
+        uname -a
+
+        export BUCKET_NAME=aix-academy-chatbot-bucket
+        python scrape_aix.py
+        python create_embeddings.py
+
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/aixbot', '.']
+
+  # Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/aixbot']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'aixbot'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/aixbot'
+      - '--platform'
+      - 'managed'
+      - '--region'
+      - 'asia-east1'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/aixbot'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamic_substitutions: true

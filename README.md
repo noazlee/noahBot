@@ -1,2 +1,2 @@
 # noahBot
-Code Repo for my ePortfolio bot
+Code Repo for Deploying on GCP with an automated script
