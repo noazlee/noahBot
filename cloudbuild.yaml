@@ -28,7 +28,7 @@ steps:
         echo "System information:"
         uname -a
 
-        export BUCKET_NAME=aix-academy-chatbot-bucket
+        export BUCKET_NAME=noah-chatbot-bucket
         python scrape_aix.py
         python create_embeddings.py
 
